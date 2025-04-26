@@ -1,0 +1,6 @@
+boto3==1.29.2
+amazon-transcribe==0.6.2
+sounddevice==0.4.6
+PyAudio==0.2.14
+Flask==2.3.3
+flask-sock==0.7.0  # WebSocket 支援
