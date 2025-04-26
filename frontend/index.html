@@ -1,20 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>Realtime Transcription</title>
+  <meta charset="UTF-8" />
+  <title>AI 語音助手</title>
 </head>
 <body>
-  <h1>🎙️ 語音即時轉錄</h1>
-  <button onclick="startRecording()">開始錄音</button>
-  <button onclick="stopRecording()">停止錄音</button>
-  <div>
-    <h2>Transcription Result:</h2>
-    <p id="transcriptionResult">Waiting for transcription...</p>
-  </div>
-  
-  <div id="transcript"></div>
+  <h1>AI 語音助手</h1>
 
-  <script src="recorder.js"></script>
+  <input type="file" id="audioInput" accept="audio/*" />
+  <button onclick="uploadAudio()">上傳並分析</button>
+
+  <h3>轉譯文字：</h3>
+  <p id="transcriptText"></p>
+
+  <h3>AI 回應：</h3>
+  <p id="aiResponseText"></p>
+
+  <h3>語音播放：</h3>
+  <audio id="audioPlayer" controls></audio>
+
+  <script>
+    async function uploadAudio() {
+      const input = document.getElementById('audioInput');
+      const file = input.files[0];
+      if (!file) {
+        alert("請選擇一個音訊檔案");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("http://localhost:5050/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        document.getElementById("transcriptText").textContent = result.transcript;
+        document.getElementById("aiResponseText").textContent = result.ai_response;
+
+        // 播放 AI 回應語音
+        const speechRes = await fetch("http://localhost:5050/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: result.ai_response }),
+        });
+
+        const blob = await speechRes.blob();
+        const audioUrl = URL.createObjectURL(blob);
+        const audioPlayer = document.getElementById("audioPlayer");
+        audioPlayer.src = audioUrl;
+        audioPlayer.play();
+      } else {
+        alert("處理失敗：" + result.error);
+      }
+    }
+  </script>
 </body>
 </html>

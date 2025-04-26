@@ -134,65 +134,203 @@ def text_to_speech(text):
         st.error(f"轉換語音時發生錯誤: {str(e)}")
         return None
     
-# Streamlit UI 組件
-st.sidebar.header("Controls")
-audio_file = st.sidebar.file_uploader("Upload Audio File", type=['wav'])
 
-# 主要內容區域
-col1, col2 = st.columns(2)
+#v2
+js_code = """
+<script>
+let recognitionRef = { current: null };
+let silenceTimer = null;
+let isListening = false;
+let restartTimer = null;
+let finalTranscript = '';
 
-with col1:
-    st.header("Your Voice Input")
-    if audio_file:
-        st.audio(audio_file)
+// 等待 Streamlit 組件準備完成
+function waitForStreamlit() {
+    return new Promise((resolve) => {
+        const checkStreamlit = () => {
+            if (window.Streamlit) {
+                resolve();
+            } else {
+                setTimeout(checkStreamlit, 100);
+            }
+        };
+        checkStreamlit();
+    });
+}
+
+function setListening(status) {
+    isListening = status;
+    document.getElementById('status').innerHTML = status ? '🎤 正在聆聽...' : '🛑 已暫停';
+    document.getElementById('toggleBtn').textContent = status ? '停止錄音' : '開始錄音';
+}
+
+async function setTranscript(text) {
+    document.getElementById('final').innerHTML = text;
+    // 確保 Streamlit 已準備好
+    if (text && text !== '空的') {
+        try {
+            await waitForStreamlit();
+            window.Streamlit.setComponentValue(text);
+        } catch (error) {
+            console.error('Streamlit 通信錯誤:', error);
+        }
+    }
+}
+
+// 開始語音辨識
+async function startListening() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("此瀏覽器不支援語音辨識 😢");
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-TW";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    recognition.onstart = () => {
+        setListening(true);
+        console.log("🎤 語音辨識已啟動");
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+      console.log("🛑 語音辨識已結束");
+
+      // 等一段時間後自動重啟（例如：1 秒）
+      restartTimer = setTimeout(() => {
+        console.log("🔄 自動重啟語音辨識...");
+        startListening();
+      }, 1000);
+    };
+
+    recognition.onresult = (event) => {
+        // 清除之前的靜音計時器
+        if (silenceTimer) {
+            clearTimeout(silenceTimer);
+        }
+
+        let interimTranscript = '';
         
-        # 處理音頻文件
-        transcript = process_audio(audio_file)
-        if transcript:
-                    st.success("音頻處理完成！")
-                    st.subheader("轉錄文字：")
-                    st.text_area("", transcript, height=200)
+        // 累積所有的識別結果
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript + ' ';
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+
+        // 顯示結果
+        const displayText = finalTranscript + interimTranscript;
+        if (displayText.trim() === "") {
+            setTranscript("空的");
+        } else {
+            setTranscript(displayText.trim());
+        }
+
+        // 設置 2 秒靜音檢測
+        silenceTimer = setTimeout(() => {
+            console.log("⏱️ 2 秒未說話，暫停語音辨識");
+            if (finalTranscript.trim()) {
+                setTranscript(finalTranscript.trim());
+            }
+            stopListening();
+        }, 2000);
+    };
+
+    recognition.onerror = (event) => {
+        console.error("語音辨識錯誤:", event.error);
+        setListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+}
+
+// 停止語音辨識
+function stopListening() {
+    if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        clearTimeout(silenceTimer);
+        setListening(false);
+        finalTranscript = ''; // 重置最終文字
+    }
+}
+
+// 切換語音辨識
+function toggleRecording() {
+    if (!isListening) {
+        finalTranscript = ''; // 開始新的錄音時重置文字
+        startListening();
+    } else {
+        stopListening();
+    }
+}
+
+// 確保 Streamlit 已加載
+waitForStreamlit().then(() => {
+    console.log('Streamlit 已準備就緒');
+}).catch(error => {
+    console.error('Streamlit 加載失敗:', error);
+});
+</script>
+
+<div>
+    <button id="toggleBtn" onclick="toggleRecording()">開始錄音</button>
+    <div id="status">🛑 已暫停</div>
+    <div>
+        <p>識別結果：<span id="final"></span></p>
+    </div>
+</div>
+"""
+
+def main():
+    
+    # 使用 components.html 來注入 JavaScript 代碼
+    st.components.v1.html(js_code, height=200)
+    
+    # 接收從 JavaScript 傳來的識別結果
+    result = st.empty()
+    
+    if st.session_state.get("speech_result"):
+        result.write(f"識別結果: {st.session_state.speech_result}")
+    # 獲取 AI 回應
+        with st.spinner('獲取 AI 回應中...'):
+            ai_response = get_ai_response(st.session_state.speech_result)
+            if ai_response:
+                # 在右側列顯示 AI 回應
+                st.header("AI 回應")
+                st.text_area("", ai_response, height=400)
+                                            
+                # 自動將 AI 回應轉換為語音並播放
+                audio_stream = text_to_speech(ai_response)
+                if audio_stream:
+                    # 使用 base64 編碼的方式來自動播放
+                    import base64
+                    audio_bytes = audio_stream.getvalue()
+                    b64 = base64.b64encode(audio_bytes).decode()
                     
-                    # 獲取 AI 回應
-                    with st.spinner('獲取 AI 回應中...'):
-                        ai_response = get_ai_response(transcript)
-                        if ai_response:
-                            # 在右側列顯示 AI 回應
-                            with col2:
-                                st.header("AI 回應")
-                                st.text_area("", ai_response, height=400)
-                                                            
-                                # 自動將 AI 回應轉換為語音並播放
-                                audio_stream = text_to_speech(ai_response)
-                                if audio_stream:
-                                    # 使用 base64 編碼的方式來自動播放
-                                    import base64
-                                    audio_bytes = audio_stream.getvalue()
-                                    b64 = base64.b64encode(audio_bytes).decode()
-                                    
-                                    # 創建自動播放的 HTML audio 元素
-                                    md = f"""
-                                        <audio id="myAudio" autoplay="true">
-                                            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-                                        </audio>
-                                        <script>
-                                            var audio = document.getElementById("myAudio");
-                                            audio.play();
-                                        </script>
-                                        """
-                                    st.markdown(md, unsafe_allow_html=True)
-                                    
-                                    # 同時也顯示一個可控的播放器
-                                    st.audio(audio_bytes)
-                            
-                                
-                        else:
-                            st.error("無法獲取 AI 回應")
-# 添加使用說明
-st.markdown("""
-### 使用說明:
-1. 在側邊欄上傳語音檔案（WAV 格式）
-2. 等待轉錄完成
-3. 查看轉錄文字和 AI 回應
-4. 聆聽 AI 的語音回應
-""")
+                    # 創建自動播放的 HTML audio 元素
+                    md = f"""
+                        <audio id="myAudio" autoplay="true">
+                            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+                        </audio>
+                        <script>
+                            var audio = document.getElementById("myAudio");
+                            audio.play();
+                        </script>
+                        """
+                    st.markdown(md, unsafe_allow_html=True)
+                    
+                    # 同時也顯示一個可控的播放器
+                    st.audio(audio_bytes)
+
+
+
+
+if __name__ == "__main__":
+    main()
