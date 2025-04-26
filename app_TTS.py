@@ -32,7 +32,7 @@ polly = boto3.client(
 )
 
 
-def upload_to_s3(audio_file, bucket_name='voice20250419'):
+def upload_to_s3(audio_file, bucket_name='hackher'):
     """上傳文件到 S3"""
     try:
         file_name = f"audio_{datetime.now().strftime('%Y%m%d%H%M%S')}.wav"

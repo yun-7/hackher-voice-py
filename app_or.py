@@ -277,7 +277,7 @@ def stream_data(stream):
     chunk = 1024
     if stream:
         polly_stream = p.open(
-            format=pyaudio.paInt16,
+            format=pyaudio.paInt32,
             channels=1,
             rate=16000,
             output=True,

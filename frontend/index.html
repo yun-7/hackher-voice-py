@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime Transcription</title>
+</head>
+<body>
+  <h1>🎙️ 語音即時轉錄</h1>
+  <button onclick="startRecording()">開始錄音</button>
+  <button onclick="stopRecording()">停止錄音</button>
+  <div>
+    <h2>Transcription Result:</h2>
+    <p id="transcriptionResult">Waiting for transcription...</p>
+  </div>
+  
+  <div id="transcript"></div>
+
+  <script src="recorder.js"></script>
+</body>
+</html>
