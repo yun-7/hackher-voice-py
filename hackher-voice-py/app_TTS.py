@@ -15,11 +15,15 @@ def load_lottiefile(filepath):
 happy_animation = load_lottiefile("fire smile.json")
 sad_animation = load_lottiefile("fire cry.json")
 neutral_animation = load_lottiefile("fire wait.json")
+talk_animation = load_lottiefile("fire talk.json")
+think_animation = load_lottiefile("fire think.json")
 
 animations = {
     "happy": happy_animation,
     "sad": sad_animation,
     "neutral": neutral_animation,
+    "talk" : talk_animation,
+    "think" : think_animation,
 }
 
 # Streamlit 頁面配置
@@ -30,7 +34,7 @@ col_animation, col_chat = st.columns([1, 2]) # 調整比例，左側動畫佔 1/
 
 with col_animation:
     st.subheader("AI 狀態")
-    selected_animation = st.selectbox("選擇動畫", ["neutral", "happy", "sad"])
+    selected_animation = st.selectbox("選擇動畫", ["neutral", "happy", "sad", "talk", "think"])
     if selected_animation in animations:
         st_lottie(animations[selected_animation], key="status_animation", height=300) # 可以調整高度
 
